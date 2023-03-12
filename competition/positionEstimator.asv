@@ -1,0 +1,96 @@
+function [x, y, newModelParameters] = positionEstimator(test_data, modelParameters)
+spikeCount = zeros(98,1);
+bin_size= 10;
+if length(test_data.spikes) <= 320
+    % Find number of spikes
+    for i = 1:98
+%         numspikes = length(find(test_data.spikes(i,1:320)==1));
+        numspikes= sum(test_data.spikes(i,1:320));
+        spikeCount(i) = numspikes;
+    end
+    % Find direction with most predictions (majority vote) and set as reaching angle
+    direction = mode(nnpredict({modelParameters(1).nnweights,modelParameters(2).nnweights},spikeCount',[98,120,8]));
+else
+    % use value that was found prevously
+    direction = modelParameters.direction;
+end
+
+% Predict movement.
+
+% current time window
+tmin = length(test_data.spikes)-20;
+tmax = length(test_data.spikes);
+%% output
+
+if length(test_data.spikes) <= 320
+    x = test_data.startHandPos(1);
+    y = test_data.startHandPos(2);
+else
+    x= test_data.decodedHandPos(1,length(test_data.decodedHandPos(1,:)));
+    y = test_data.decodedHandPos(2,length(test_data.decodedHandPos(2,:)));
+    
+    for j=1:20/bin_size
+        % Calculate firing rate
+        firingRate = zeros(98,1);
+        for i = 1:98
+        %     numspikes = length(find(test_data.spikes(i,tmin:tmax)==1));
+            numspikes= sum(test_data.spikes(i, tmin:(tmax-(2-j)*10)));
+            firingRate(i) = numspikes/(10*0.001);
+        end
+        
+        % Estimate velocity.
+        % velocity= resubPredict(modelParameters(1).v_predict(direction).reachingAngle);
+        
+        velocity_x = firingRate'*modelParameters(1).v_predict(direction).reachingAngle(:,1);
+        velocity_y = firingRate'*modelParameters(1).v_predict(direction).reachingAngle(:,2);
+        % velocity_x= predict(modelParameters(1).v_predict(direction).pred_x, firingRate');
+        % velocity_y= predict(modelParameters(1).v_predict(direction).pred_y, firingRate');
+    end
+    % s = s_0 + v * t
+    x = x + velocity_x*(10*0.001);
+    y = y + velocity_y*(10*0.001);
+end
+    
+newModelParameters(1).v_predict = modelParameters(1).v_predict;
+newModelParameters(1).nnweights = modelParameters(1).nnweights;
+newModelParameters(2).nnweights = modelParameters(2).nnweights;
+newModelParameters(1).direction = direction;
+        
+
+function p = nnpredict(weights, X, layer_sizes)
+m = size(X, 1);
+%p = zeros(size(X, 1), 1);
+
+% Init sum and activation.
+for i = 1:(size(layer_sizes,2))
+    z{i} = zeros(m,layer_sizes(i));
+    a{i} = zeros(m,layer_sizes(i));
+end
+
+a{1,1} = [ones(m, 1) X]; 
+
+for i = 2:(size(layer_sizes,2))
+    z{1,i} = a{1,i-1}*weights{1,i-1}';
+    a{1,i} = sigmoid(z{1,i});
+    if i ~= size(layer_sizes,2)
+        a{1,i} = [ones(m,1) a{1,i}];
+    end
+end
+
+[~, p] = max(a{1,end}, [], 2);
+end
+
+function x = sigmoid(z)
+    x = 1.0 ./ (1.0 + exp(-z));
+end
+
+%     function k= kalmanfilter(g_matrix)
+%         N_obs= 50;
+%         v_est= zeros(N_obs,1); % 50 observations, 1 output (should be changed to 2 output: vel_x, and vel_y
+%         A= ; %state coefficient matrix
+%         B= g_matrix';%input coefficient matrix obtained from lsqminnorm
+% 
+%     end
+
+
+end

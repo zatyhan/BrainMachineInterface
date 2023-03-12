@@ -5,32 +5,35 @@
 % "positionEstimator" to decode the trajectory. 
 
 function RMSE = testFunction_for_students_MTb(teamName)
+startT= tic;
 
-load monkeydata0.mat
+load monkeydata_training.mat;
 
 % Set random number generator
-rng(2013);
+rng(2023);
 ix = randperm(length(trial));
 
-addpath(teamName);
+%addpath(teamName);
 
 % Select training and testing data (you can choose to split your data in a different way if you wish)
 trainingData = trial(ix(1:50),:);
 testData = trial(ix(51:end),:);
+warning off
 
-fprintf('Testing the continuous position estimator...')
+fprintf('Testing the continuous position estimator...\n')
 
 meanSqError = 0;
 n_predictions = 0;  
 
-figure
+figure(2)
 hold on
 axis square
 grid
 
 % Train Model
+fprintf('Training......\n');
 modelParameters = positionEstimatorTraining(trainingData);
-
+fprintf('Training Done!\n');
 for tr=1:size(testData,1)
     display(['Decoding block ',num2str(tr),' out of ',num2str(size(testData,1))]);
     pause(0.001)
@@ -48,6 +51,7 @@ for tr=1:size(testData,1)
             
             if nargout('positionEstimator') == 3
                 [decodedPosX, decodedPosY, newParameters] = positionEstimator(past_current_trial, modelParameters);
+%                 fprintf("position Y: "+ num2str(decodedPosY));
                 modelParameters = newParameters;
             elseif nargout('positionEstimator') == 2
                 [decodedPosX, decodedPosY] = positionEstimator(past_current_trial, modelParameters);
@@ -68,8 +72,9 @@ end
 
 legend('Decoded Position', 'Actual Position')
 
-RMSE = sqrt(meanSqError/n_predictions) 
+RMSE = sqrt(meanSqError/n_predictions)
 
-rmpath(genpath(teamName))
-
+%rmpath(genpath(teamName))
+endT= toc(startT);
+fprintf("Time elapsed: "+ num2str(endT))
 end
